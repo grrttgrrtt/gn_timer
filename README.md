@@ -5,6 +5,7 @@ There is probably an already existing python module for this. I wrote this one t
 
 To use, import either gn_timer (for python 3) or gn_timer_py2 (for python 2).
 
+Due to updates, gn_typer_py2 now works differently than gn_timer; it functions more simply but with fewer options.
 
 Time values are stored at
 the class level, so multiple generated timer objects will all increment the same
