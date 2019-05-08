@@ -27,7 +27,7 @@ METHODS:
 Timer.define_timers(timer_dict: dict) -> None:
     Pre-initializes takes a dictionary of abbreviation: attribute pairs.
 
-Timer.time(timer_key: str) -> Callable:
+Timer.timer(timer_key: str) -> Callable:
     Wrapper function to time other functions. Time in seconds of execution is
     stored in the class attribute indicated by timer_key.
 
@@ -42,46 +42,30 @@ CHANGELOG:
 4-24-19: Updated to use cls.__dict__ instead of a dict attribute
 4-24-19: Branched from gn_timer.py to remove type hints and be python 2
     compatible.
+4-30-19: Updated to prevent dynamic timer creation overwriting class functions
+5-8-19: Updated wrapper to pass functions names through; useful when
+    double-wrapping
 """
 import time as time_module
 
 
 class Timer:
     """
-    ATTRIBUTES:
-        _allow_dynamic_timer_creation: bool
-            governs whether or not new attributes can be created on the fly
-            by the _time() function
-
     METHODS:
-    Timer._define_timers(timer_dict: dict) -> None:
-        Pre-initializes takes a dictionary of abbreviation: attribute pairs.
 
-    Timer._time(timer_key: str) -> Callable:
+    Timer.timer() -> Callable:
         Wrapper function to time other functions. Time in seconds of execution is
         stored in the class attribute indicated by timer_key.
 
-    Timer._restrict_abbrs() -> None:
-        Disables dynamically creating attributes and requires all timers to be
-        pre-initialized using define_timers().
 
     """
-    _allow_dynamic_timer_creation = True
-
     def __init__(self):
         return
 
-    @classmethod
-    def _define_timers(cls, timer_dict):
-        """
-        Dynamically create attributes in the Timer class based on timer_dict
-        :param timer_dict: dictionary of timer_key: attribute_name pairs
-        :return:
-        """
-        # for attribute_name in timer_dict.values():
-        #     setattr(cls, attribute_name, 0)
-        # cls.timer_dict = timer_dict
-        cls.__dict__.update(timer_dict)
+    def __setattr__(self, name, value):
+        if name == 'timer':
+            raise Exception("cannot overwrite timer")
+        self.__dict__[name] = value
         return
 
     @classmethod
@@ -95,38 +79,24 @@ class Timer:
         timer attribute
         :return: None
         """
-        # timer_value = getattr(cls, cls.timer_dict[timer_key])
-        if not hasattr(cls, timer_key) and cls._allow_dynamic_timer_creation:
+        if not hasattr(cls, timer_key):
             setattr(cls, timer_key, 0)
         timer_value = getattr(cls, timer_key)
         new_timer_value = timer_value + sec_to_increment
-        # setattr(cls, cls.timer_dict[timer_key], new_timer_value)
         setattr(cls, timer_key, new_timer_value)
         return
 
     @classmethod
-    def _time(cls, timer_key):
-        """
-        wrapper function to decorate functions with.
-        Use @Timer.time( 'timer_key')
-        :param timer_key: key corresponding to the timer attribute you wish
-        to increment
-        :return:
-        """
-        def decorate(func):
-            def call(*args, **kwargs):
-                t0 = time_module.time()
-                result = func(*args, **kwargs)
-                t1 = time_module.time()
-                cls._increment_time(timer_key, t1 - t0)
-                return result
-            return call
-        return decorate
-
-    @classmethod
-    def _restrict_timers(cls):
-        cls._allow_dynamic_timer_creation = False
-        return
+    def timer(cls, func):
+        def call(*args, **kwargs):
+            t0 = time_module.time()
+            result = func(*args, **kwargs)
+            t1 = time_module.time()
+            timer_key = func.__name__
+            cls._increment_time(timer_key, t1 - t0)
+            return result
+        call.__name__ = func.__name__
+        return call
 
 
 def print_times():
@@ -137,6 +107,8 @@ def print_times():
     # for attribute_name in self.timer_dict.values():
     for attribute_name in Timer.__dict__:
         if attribute_name.startswith('_'):
+            continue
+        if attribute_name == 'timer':
             continue
         time_value = getattr(Timer, attribute_name)
         print("{0}: {1}".format(attribute_name, time_value))
